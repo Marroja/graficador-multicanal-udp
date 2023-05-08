@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="graficador-multicanal-udp:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/graficador_multicanal_udp_jar</output-path>
+    <root id="archive" name="graficador-multicanal-udp.jar">
+      <element id="module-output" name="graficador-multicanal-udp" />
+    </root>
+  </artifact>
+</component>
