@@ -15,8 +15,10 @@ public class VentanaPrincipal extends JFrame {
     final int ANCHO_ORIGINAL = 500;
     final int ALTO_ORIGINAL = 500;
     boolean bloqueado = false;
+
     long ultimoTiempoDibujo = 0;
     long momentoMilis = 0;
+
 
     VentanaPrincipal()
     {
@@ -52,6 +54,7 @@ public class VentanaPrincipal extends JFrame {
                 //Para pausar la graficación
                 if(e.getKeyChar() == KeyEvent.VK_SPACE){
                     bloqueado = !bloqueado;
+                    VP.repaint();
                 }
             }
 
@@ -159,6 +162,12 @@ public class VentanaPrincipal extends JFrame {
                 //Interruptor de cambio para modo Lissajous
                 if(e.getKeyCode() == KeyEvent.VK_L){
                     lienzo.modoLissajous = !lienzo.modoLissajous;
+                    lienzo.pintaFondo();
+                }
+
+                //Interruptor de cambio para mostrar puntos o puntos y líneas
+                if(e.getKeyCode() == KeyEvent.VK_P){
+                    lienzo.soloPuntos = !lienzo.soloPuntos;
                     lienzo.pintaFondo();
                 }
 
@@ -284,6 +293,8 @@ class Lienzo extends JPanel {
     int desfaseY1 = 0;
     int desfaseY2 = 0;
 
+    boolean soloPuntos = false;
+
     int contadorX = 0;
     boolean modoLissajous = false;
     Lienzo(int ancho, int alto) {
@@ -315,7 +326,7 @@ class Lienzo extends JPanel {
 
             //Eje Y
             double numeroVoltaje = (ALTO_ORIGINAL / pixelesPorVoltY) / 2.0 - ALTO_ORIGINAL / pixelesPorVoltY / 10.0 * i;
-            numeroVoltaje = (double) (int) (100 * (numeroVoltaje)) / 100;
+            numeroVoltaje = (double) (int) (100 * (numeroVoltaje)) / 100; //redondeo a dos dígitos
             String textoVoltaje = String.valueOf(numeroVoltaje);
             g.drawString(textoVoltaje, this.getWidth() / 2, this.getHeight() / 10 * i + this.getWidth() / 50);
 
@@ -411,7 +422,11 @@ class Lienzo extends JPanel {
                     } else {
                         if (x_anterior != this.getWidth()) {
                             //Si el valor de X es diferente al primero, se conecta con una línea.
-                            g.drawLine(x_anterior, y_anterior, x, y);
+                            if(soloPuntos){
+
+                            }else{
+                                g.drawLine(x_anterior, y_anterior, x, y);
+                            }
                         }
                         g.fillRect(x, y, 2, 2);
                         //Guardamos el punto para la siguiente iteración
@@ -453,7 +468,11 @@ class Lienzo extends JPanel {
                     } else {
                         if (x_anterior != this.getWidth()) {
                             //Si el valor de X es diferente al primero, se conecta con una línea.
-                            g.drawLine(x_anterior, y_anterior, x, y);
+                            if(soloPuntos){
+
+                            }else{
+                                g.drawLine(x_anterior, y_anterior, x, y);
+                            }
                         }
                         g.fillRect(x, y, 2, 2);
                         //Guardamos el punto para la siguiente iteración
@@ -474,6 +493,8 @@ class Lienzo extends JPanel {
             int[] pixelesX = new int[tamMuestra];
             int[] pixelesY = new int[tamMuestra];
 
+            int xAnterior = -10;
+            int yAnterior = -10;
             Arrays.fill(pixelesY, -10);
             Arrays.fill(pixelesX, -10);
 
@@ -483,6 +504,7 @@ class Lienzo extends JPanel {
             //Ese número se redondea a un entero y ese se convierte en un índice de pixelesX o pixelesY. Se guardan
             //así los dos arreglos. A veces hay índices que no coinciden por lo que hay espacios que no se grafican.
             //Sin embargo, es suficientemente bueno este método, al menos es funcional.
+
             try{
                 for(int i = 1; i < listaMomentos1.size(); i++){
                     int posTiempo = (int) ((momentoNanos - (listaMomentos1.get(listaMomentos1.size() - i)))
@@ -499,15 +521,26 @@ class Lienzo extends JPanel {
                     int posTiempo = (int) ((momentoNanos - (listaMomentos2.get(listaMomentos2.size() - i)))
                             / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL));
 
+
                     if(posTiempo < tamMuestra && posTiempo >= 0 && pixelesY[posTiempo] == -10){
-                        pixelesY[posTiempo] = (int) (listaVoltajes2.get(listaVoltajes2.size() - i)
+                        pixelesY[posTiempo] = -(int) (listaVoltajes2.get(listaVoltajes2.size() - i)
                                                         * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight()
-                                                        + this.getHeight() / 2);
+                                                        - this.getHeight() / 2);
                     }
                 }
 
                 for(int i = 0; i < tamMuestra; i++){
+                    if(soloPuntos){
+
+                    }
+                    else{
+                        if(xAnterior >= 0 && yAnterior >= 0 && pixelesX[i] >= 0 && pixelesY[i] >= 0){
+                            g.drawLine(xAnterior, yAnterior, pixelesX[i], pixelesY[i]);
+                        }
+                    }
                     g.fillRect(pixelesX[i], pixelesY[i], 2,2);
+                    xAnterior = pixelesX[i];
+                    yAnterior = pixelesY[i];
                 }
 
 

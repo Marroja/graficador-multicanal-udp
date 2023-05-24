@@ -28,8 +28,10 @@ public class VentanaControles extends JFrame {
         JLabel lDesplY1 = new JLabel("%Despl. Y1:");
         JLabel lDesplY2 = new JLabel("%Despl. Y2:");
         JLabel lLissajous = new JLabel("Lissajous");
-        JTextField tfEscalaEjeX = new JTextField(String.valueOf(VP.lienzo.nanoSegundosPorPixelX));
-        JTextField tfEscalaEjeY = new JTextField(String.valueOf(VP.lienzo.pixelesPorVoltY));
+        double nanosegundosPorCuadro = (VP.lienzo.ANCHO_ORIGINAL / 10.0 * VP.lienzo.nanoSegundosPorPixelX);
+        JTextField tfEscalaEjeX = new JTextField(String.valueOf(nanosegundosPorCuadro));
+        double voltsPorCuadro = VP.lienzo.ALTO_ORIGINAL / VP.lienzo.pixelesPorVoltY / 10.0;
+        JTextField tfEscalaEjeY = new JTextField(String.valueOf(voltsPorCuadro));
         JTextField tfDesplX = new JTextField(String.valueOf(VP.lienzo.desfaseX));
         JTextField tfDesplY1 = new JTextField(String.valueOf(VP.lienzo.desfaseY1));
         JTextField tfDesplY2 = new JTextField(String.valueOf(VP.lienzo.desfaseY2));
@@ -70,7 +72,9 @@ public class VentanaControles extends JFrame {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     try{
-                        VP.lienzo.nanoSegundosPorPixelX = Double.parseDouble(tfEscalaEjeX.getText().replace("_", ""));
+                        double nanoSegundosPorCuadro = Double.parseDouble(tfEscalaEjeX.getText().replace("_", ""));
+                        //nanosegundosPorCuadro = (int) (-(double) ANCHO_ORIGINAL / 10.0 * nanoSegundosPorPixelX);
+                        VP.lienzo.nanoSegundosPorPixelX = nanoSegundosPorCuadro / VP.ANCHO_ORIGINAL * 10;
                     }catch (NumberFormatException err){
                         VP.lienzo.nanoSegundosPorPixelX = 1000_000.0;
                         tfEscalaEjeX.setText("1000_000.0");
@@ -84,10 +88,14 @@ public class VentanaControles extends JFrame {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     try{
-                        VP.lienzo.pixelesPorVoltY = Double.parseDouble(tfEscalaEjeY.getText().replace("_", ""));
-                        VP.lienzo.pixelesPorVoltX = Double.parseDouble(tfEscalaEjeY.getText().replace("_", ""));
+                        double voltsPorCuadro = Double.parseDouble(tfEscalaEjeY.getText().replace("_",""));
+                        //double voltsPorCuadro = VP.lienzo.ALTO_ORIGINAL / VP.lienzo.pixelesPorVoltY / 10.0;
+                        VP.lienzo.pixelesPorVoltY = VP.lienzo.ALTO_ORIGINAL / 10.0 / voltsPorCuadro;
+                        VP.lienzo.pixelesPorVoltX = VP.lienzo.ALTO_ORIGINAL / 10.0 / voltsPorCuadro;
+
                     }catch (NumberFormatException err){
                         VP.lienzo.pixelesPorVoltX = 1.0;
+                        VP.lienzo.pixelesPorVoltY = 1.0;
                         tfEscalaEjeY.setText("1.0");
                     }
                     VP.lienzo.pintaFondo();
@@ -95,20 +103,6 @@ public class VentanaControles extends JFrame {
                 }
             });
 
-            tfEscalaEjeY.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    try{
-                        VP.lienzo.pixelesPorVoltY = Double.parseDouble(tfEscalaEjeY.getText().replace("_", ""));
-                        VP.lienzo.pixelesPorVoltX = Double.parseDouble(tfEscalaEjeY.getText().replace("_", ""));
-                    }catch (NumberFormatException err){
-                        VP.lienzo.pixelesPorVoltX = 1.0;
-                        tfEscalaEjeY.setText("1.0");
-                    }
-                    VP.lienzo.pintaFondo();
-                    VP.requestFocus();
-                }
-            });
 
             tfDesplX.addActionListener(new ActionListener() {
                 @Override
