@@ -413,7 +413,7 @@ class Lienzo extends JPanel {
                     x -= this.getWidth() / 100 * desfaseX;                                //Desfase por manipulación
                     //Hacemos lo mismo con Y. Partimos del punto central, le sumamos el voltaje multiplicado
                     //por el factor de calibración en las dimensiones iniciales.
-                    y += listaVoltajes1.get(listaVoltajes1.size() - i)           //Voltaje recibido por UDP
+                    y -= listaVoltajes1.get(listaVoltajes1.size() - i)           //Voltaje recibido por UDP
                             * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight() //Factor de escala
                             - this.getHeight() / 100 * desfaseY1;                //Manipulación eje Y
                     if (x < 0) {
@@ -459,7 +459,7 @@ class Lienzo extends JPanel {
                     x -= this.getWidth() / 100 * desfaseX;                                //Desfase por manipulación
                     //Hacemos lo mismo con Y. Partimos del punto central, le sumamos el voltaje multiplicado
                     //por el factor de calibración en las dimensiones iniciales.
-                    y += listaVoltajes2.get(listaVoltajes2.size() - i)           //Voltaje recibido por UDP
+                    y -= listaVoltajes2.get(listaVoltajes2.size() - i)           //Voltaje recibido por UDP
                             * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight() //Factor de escala
                             - this.getHeight() / 100 * desfaseY2;                //Manipulación eje Y
                     if (x < 0) {
