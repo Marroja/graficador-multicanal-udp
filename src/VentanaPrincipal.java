@@ -7,6 +7,7 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 
 public class VentanaPrincipal extends JFrame {
 
@@ -54,7 +55,8 @@ public class VentanaPrincipal extends JFrame {
                 //Para pausar la graficación
                 if(e.getKeyChar() == KeyEvent.VK_SPACE){
                     bloqueado = !bloqueado;
-                    VP.repaint();
+                    lienzo.pintaGrafica(ultimoTiempoDibujo);
+                    lienzo.paintComponent(lienzo.getGraphics());
                 }
             }
 
@@ -179,7 +181,6 @@ public class VentanaPrincipal extends JFrame {
                 lienzo.paintComponent(lienzo.getGraphics());
             }
 
-
         });
 
         this.setSize(ANCHO_ORIGINAL, ALTO_ORIGINAL);
@@ -192,43 +193,11 @@ public class VentanaPrincipal extends JFrame {
 
     public void agregaValor(String nombre, long momento, double voltaje){
 
-        // Desde la clase de BuzonUDP se guardan todos los valores recibido en el buzón a estas ArrayList.
-        // Existen otras opciones más seguras como tener dos ArrayList, una donde la escritura es concurrente y
-        // otra a donde se copia la lista completa en vez de modificarla simultáneamente. Realizar esos cambios
-        // queda para una revisión posterior. QPH
-
-        if(bloqueado)
-            return;
-        //Con 100_000 lecturas máximas tenemos un buffer de máximas 100_000 lecturas en cada instante
-        //Esto significa que si mandamos más de 100_000 lecturas por segundo (100kHz) va a graficarse
-        //Incompleta la gráfica.
-        if(lienzo.nombreDispositivo1 != null && lienzo.nombreDispositivo1.equals(nombre)){
-            lienzo.listaMomentos1.add(momento);
-            lienzo.listaVoltajes1.add(voltaje);
-            try{
-                while (lienzo.listaVoltajes1.size() > 100_000){
-                    lienzo.listaVoltajes1.remove(0);
-                    lienzo.listaMomentos1.remove(0);
-                }
-            }catch (IndexOutOfBoundsException e){
-
-            }
+        if(!bloqueado){
+            lienzo.agregaValor(nombre, momento, voltaje);
         }
 
-        if(lienzo.nombreDispositivo2 != null && lienzo.nombreDispositivo2.equals(nombre)){
-            lienzo.listaMomentos2.add(momento);
-            lienzo.listaVoltajes2.add(voltaje);
-            try{
-                while(lienzo.listaVoltajes2.size() > 100_000){
-                    lienzo.listaVoltajes2.remove(0);
-                    lienzo.listaMomentos2.remove(0);
-                }
-            }catch (IndexOutOfBoundsException e){
-
-            }
-        }
     }
-
     public int grafica(){
         if(!bloqueado) {
             final int INTERVALO = 20;
@@ -259,7 +228,6 @@ public class VentanaPrincipal extends JFrame {
     }
 }
 
-
 /*
     La clase de Lienzo es un JPanel en el que se da el Override al método de PaintComponent.
     En el Lienzo existen dos BufferedImage, uno es el fondo (el cual solo se tiene que re-calcular cuando se cambia
@@ -276,11 +244,14 @@ public class VentanaPrincipal extends JFrame {
 
 class Lienzo extends JPanel {
 
-    ArrayList<Long> listaMomentos1;
-    ArrayList<Double> listaVoltajes1;
+    final int TAM_BUFFER = 30_000;
+    long[] listaMomentos1;
+    long[] listaMomentos2;
+    double[] listaVoltajes1;
+    double[] listaVoltajes2;
+    int contadorCanal1 = 0;
+    int contadorCanal2 = 0;
     String nombreDispositivo1 = null;
-    ArrayList<Long> listaMomentos2;
-    ArrayList<Double> listaVoltajes2;
     String nombreDispositivo2 = null;
     BufferedImage bi;
     BufferedImage fondo;
@@ -301,13 +272,29 @@ class Lienzo extends JPanel {
         this.setSize(ancho, alto);
         bi = new BufferedImage((int) ANCHO_ORIGINAL, (int) ALTO_ORIGINAL, BufferedImage.TYPE_INT_RGB);
         fondo = new BufferedImage((int) ANCHO_ORIGINAL, (int) ALTO_ORIGINAL, BufferedImage.TYPE_INT_RGB);
-        listaMomentos1 = new ArrayList<>();
-        listaVoltajes1 = new ArrayList<>();
-        listaMomentos2 = new ArrayList<>();
-        listaVoltajes2 = new ArrayList<>();
-        //System.out.println("Dimensiones lienzo:" +this.getWidth() + ":"+this.getHeight());
-    }
+        listaMomentos1 = new long[TAM_BUFFER];
+        listaVoltajes1 = new double[TAM_BUFFER];
+        listaMomentos2 = new long[TAM_BUFFER];
+        listaVoltajes2 = new double[TAM_BUFFER];
 
+        int yTrigger = 0;
+    }
+    public void agregaValor(String nombre, long momento, double valor){
+        if(Objects.equals(nombre, nombreDispositivo1)){
+            listaMomentos1[contadorCanal1] = momento;
+            listaVoltajes1[contadorCanal1] = valor;
+
+            contadorCanal1 ++;
+            contadorCanal1 %= TAM_BUFFER;
+        }
+        if(Objects.equals(nombre, nombreDispositivo2)) {
+            listaMomentos2[contadorCanal2] = momento;
+            listaVoltajes2[contadorCanal2] = valor;
+
+            contadorCanal2 ++;
+            contadorCanal2 %= TAM_BUFFER;
+        }
+    }
     public void pintaFondo(){
 
         Graphics2D g = (Graphics2D) fondo.getGraphics();
@@ -399,44 +386,41 @@ class Lienzo extends JPanel {
             int y_anterior = this.getHeight() / 2;
 
             //
-            for (int i = 0; i < listaMomentos1.size(); i += 1) {
+            for (int i = 0; i < listaMomentos1.length; i += 1) {
                 int x = this.getWidth();
                 int y = this.getHeight() / 2;
-                try {
-                    //Comenzamos a dibujar desde la derecha
-                    //Calculamos el valor de X con el momentoNanos, le restamos el valor del tiempo que viene en el
-                    //paquete de lectura.
-                    //Luego lo multiplicamos por el facto de escala con el que se calibró al inicio.
-                    //Se resta porque partimos desde el extremo derecho
-                    x -= (momentoNanos - (listaMomentos1.get(listaMomentos1.size() - i))) //momentoNanos - tPaquete
-                            / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL); //Factor de escala
-                    x -= this.getWidth() / 100 * desfaseX;                                //Desfase por manipulación
-                    //Hacemos lo mismo con Y. Partimos del punto central, le sumamos el voltaje multiplicado
-                    //por el factor de calibración en las dimensiones iniciales.
-                    y -= listaVoltajes1.get(listaVoltajes1.size() - i)           //Voltaje recibido por UDP
-                            * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight() //Factor de escala
-                            - this.getHeight() / 100 * desfaseY1;                //Manipulación eje Y
-                    if (x < 0) {
-                        //Si el valor graficado ya excede el lado izquierdo de la venatana, no es necesario graficar
-                        //Así ahorramos el dibujo de los puntos que no aparecen en pantalla
-                    } else {
-                        if (x_anterior != this.getWidth()) {
-                            //Si el valor de X es diferente al primero, se conecta con una línea.
-                            if(soloPuntos){
+                //Comenzamos a dibujar desde la derecha
+                //Calculamos el valor de X con el momentoNanos, le restamos el valor del tiempo que viene en el
+                //paquete de lectura.
+                //Luego lo multiplicamos por el facto de escala con el que se calibró al inicio.
+                //Se resta porque partimos desde el extremo derecho
+                x -= (momentoNanos - (listaMomentos1[TAM_BUFFER - 1 - i])) //momentoNanos - tPaquete
+                        / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL); //Factor de escala
+                x -= this.getWidth() / 100 * desfaseX;                                //Desfase por manipulación
+                //Hacemos lo mismo con Y. Partimos del punto central, le sumamos el voltaje multiplicado
+                //por el factor de calibración en las dimensiones iniciales.
+                y -= listaVoltajes1[TAM_BUFFER - 1 - i]           //Voltaje recibido por UDP
+                        * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight() //Factor de escala
+                        - this.getHeight() / 100 * desfaseY1                 //Manipulación eje Y
+                        - 0;                                                 //Manipulación Trigger
+                if (x < 0) {
+                    //Si el valor graficado ya excede el lado izquierdo de la venatana, no es necesario graficar
+                    //Así ahorramos el dibujo de los puntos que no aparecen en pantalla
+                } else {
+                    if (x_anterior != this.getWidth()) {
+                        //Si el valor de X es diferente al primero, se conecta con una línea.
+                        if(soloPuntos){
 
-                            }else{
+                        }else{
+                            if(x < x_anterior){
                                 g.drawLine(x_anterior, y_anterior, x, y);
                             }
                         }
-                        g.fillRect(x, y, 2, 2);
-                        //Guardamos el punto para la siguiente iteración
-                        x_anterior = x;
-                        y_anterior = y;
                     }
-                } catch (NullPointerException | IndexOutOfBoundsException er) {
-                    //Como la modificación de los ArrayList es concurrente por el hilo de ejecución del buzónUDP
-                    //A veces el arreglo habrá crecido uno o dos elementos más de los que aparecen en el .size()
-                    //También a veces se cambia su dirección y por eso ocurre el NullPointerException
+                    g.fillRect(x, y, 2, 2);
+                    //Guardamos el punto para la siguiente iteración
+                    x_anterior = x;
+                    y_anterior = y;
                 }
             }
 
@@ -445,44 +429,41 @@ class Lienzo extends JPanel {
             y_anterior = this.getHeight() / 2;
 
             g.setColor(Color.GREEN);
-            for (int i = 0; i < listaMomentos2.size(); i += 1) {
+            for (int i = 0; i < listaMomentos2.length; i += 1) {
                 int x = this.getWidth();
                 int y = this.getHeight() / 2;
-                try {
-                    //Comenzamos a dibujar desde la derecha
-                    //Calculamos el valor de X con el momentoNanos, le restamos el valor del tiempo que viene en el
-                    //paquete de lectura.
-                    //Luego lo multiplicamos por el facto de escala con el que se calibró al inicio.
-                    //Se resta porque partimos desde el extremo derecho
-                    x -= (momentoNanos - (listaMomentos2.get(listaMomentos2.size() - i))) //momentoNanos - tPaquete
-                            / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL); //Factor de escala
-                    x -= this.getWidth() / 100 * desfaseX;                                //Desfase por manipulación
-                    //Hacemos lo mismo con Y. Partimos del punto central, le sumamos el voltaje multiplicado
-                    //por el factor de calibración en las dimensiones iniciales.
-                    y -= listaVoltajes2.get(listaVoltajes2.size() - i)           //Voltaje recibido por UDP
-                            * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight() //Factor de escala
-                            - this.getHeight() / 100 * desfaseY2;                //Manipulación eje Y
-                    if (x < 0) {
-                        //Si el valor graficado ya excede el lado izquierdo de la venatana, no es necesario graficar
-                        //Así ahorramos el dibujo de los puntos que no aparecen en pantalla
-                    } else {
-                        if (x_anterior != this.getWidth()) {
-                            //Si el valor de X es diferente al primero, se conecta con una línea.
-                            if(soloPuntos){
+                //Comenzamos a dibujar desde la derecha
+                //Calculamos el valor de X con el momentoNanos, le restamos el valor del tiempo que viene en el
+                //paquete de lectura.
+                //Luego lo multiplicamos por el facto de escala con el que se calibró al inicio.
+                //Se resta porque partimos desde el extremo derecho
+                x -= (momentoNanos - (listaMomentos2[TAM_BUFFER - 1 - i])) //momentoNanos - tPaquete
+                        / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL); //Factor de escala
+                x -= this.getWidth() / 100 * desfaseX;                                //Desfase por manipulación
+                //Hacemos lo mismo con Y. Partimos del punto central, le sumamos el voltaje multiplicado
+                //por el factor de calibración en las dimensiones iniciales.
+                y -= listaVoltajes2[TAM_BUFFER - 1 - i]           //Voltaje recibido por UDP
+                        * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight() //Factor de escala
+                        - this.getHeight() / 100 * desfaseY2                //Manipulación eje Y
+                        - 0;                                                 //Manipulación Trigger
+                if (x < 0) {
+                    //Si el valor graficado ya excede el lado izquierdo de la venatana, no es necesario graficar
+                    //Así ahorramos el dibujo de los puntos que no aparecen en pantalla
+                } else {
+                    if (x_anterior != this.getWidth()) {
+                        //Si el valor de X es diferente al primero, se conecta con una línea.
+                        if(soloPuntos){
 
-                            }else{
+                        }else{
+                            if(x < x_anterior){
                                 g.drawLine(x_anterior, y_anterior, x, y);
                             }
                         }
-                        g.fillRect(x, y, 2, 2);
-                        //Guardamos el punto para la siguiente iteración
-                        x_anterior = x;
-                        y_anterior = y;
                     }
-                } catch (NullPointerException | IndexOutOfBoundsException er) {
-                    //Como la modificación de los ArrayList es concurrente por el hilo de ejecución del buzónUDP
-                    //A veces el arreglo habrá crecido uno o dos elementos más de los que aparecen en el .size()
-                    //También a veces se cambia su dirección y por eso ocurre el NullPointerException
+                    g.fillRect(x, y, 2, 2);
+                    //Guardamos el punto para la siguiente iteración
+                    x_anterior = x;
+                    y_anterior = y;
                 }
             }
         }
@@ -505,54 +486,48 @@ class Lienzo extends JPanel {
             //así los dos arreglos. A veces hay índices que no coinciden por lo que hay espacios que no se grafican.
             //Sin embargo, es suficientemente bueno este método, al menos es funcional.
 
-            try{
-                for(int i = 1; i < listaMomentos1.size(); i++){
-                    int posTiempo = (int) ((momentoNanos - (listaMomentos1.get(listaMomentos1.size() - i)))
-                            / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL));
+            for(int i = 1; i < listaMomentos1.length; i++){
+                int posTiempo = (int) ((momentoNanos - (listaMomentos1[listaMomentos1.length - i]))
+                        / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL));
 
-                    if(posTiempo < tamMuestra && posTiempo >= 0 && pixelesX[posTiempo] == -10){
-                        pixelesX[posTiempo] = (int) (listaVoltajes1.get(listaVoltajes1.size() - i)
-                                                        * pixelesPorVoltX / ANCHO_ORIGINAL * this.getWidth()
-                                                        + this.getWidth() / 2);
-                    }
+                if(posTiempo < tamMuestra && posTiempo >= 0 && pixelesX[posTiempo] == -10){
+                    pixelesX[posTiempo] = (int) (listaVoltajes1[listaVoltajes1.length - i]
+                                                    * pixelesPorVoltX / ANCHO_ORIGINAL * this.getWidth()
+                                                    + this.getWidth() / 2);
                 }
-
-                for(int i = 1; i < listaMomentos2.size(); i++){
-                    int posTiempo = (int) ((momentoNanos - (listaMomentos2.get(listaMomentos2.size() - i)))
-                            / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL));
-
-
-                    if(posTiempo < tamMuestra && posTiempo >= 0 && pixelesY[posTiempo] == -10){
-                        pixelesY[posTiempo] = -(int) (listaVoltajes2.get(listaVoltajes2.size() - i)
-                                                        * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight()
-                                                        - this.getHeight() / 2);
-                    }
-                }
-
-                for(int i = 0; i < tamMuestra; i++){
-                    if(soloPuntos){
-
-                    }
-                    else{
-                        if(xAnterior >= 0 && yAnterior >= 0 && pixelesX[i] >= 0 && pixelesY[i] >= 0){
-                            g.drawLine(xAnterior, yAnterior, pixelesX[i], pixelesY[i]);
-                        }
-                    }
-                    g.fillRect(pixelesX[i], pixelesY[i], 2,2);
-                    xAnterior = pixelesX[i];
-                    yAnterior = pixelesY[i];
-                }
-
-
-            }catch (IndexOutOfBoundsException | NullPointerException e){
-
             }
+
+            for(int i = 1; i < listaMomentos2.length; i++){
+                int posTiempo = (int) ((momentoNanos - (listaMomentos2[listaMomentos2.length - i]))
+                        / (nanoSegundosPorPixelX / this.getWidth() * ANCHO_ORIGINAL));
+
+
+                if(posTiempo < tamMuestra && posTiempo >= 0 && pixelesY[posTiempo] == -10){
+                    pixelesY[posTiempo] = -(int) (listaVoltajes2[listaVoltajes2.length - i]
+                                                    * pixelesPorVoltY / ALTO_ORIGINAL * this.getHeight()
+                                                    - this.getHeight() / 2);
+                }
+            }
+
+            for(int i = 0; i < tamMuestra; i++){
+                if(soloPuntos){
+
+                }
+                else{
+                    if(xAnterior >= 0 && yAnterior >= 0 && pixelesX[i] >= 0 && pixelesY[i] >= 0){
+                        g.drawLine(xAnterior, yAnterior, pixelesX[i], pixelesY[i]);
+                    }
+                }
+                g.fillRect(pixelesX[i], pixelesY[i], 2,2);
+                xAnterior = pixelesX[i];
+                yAnterior = pixelesY[i];
+            }
+
         }
 
         g.dispose();
         return 1;
     }
-
     public void paintComponent(Graphics g) {
 
         g.drawImage(bi, 0, 0, null);

@@ -56,9 +56,9 @@ public class Main {
         hd = new HiloDibujo(VP);
 
         hudp1.start();
-        VP.ponNombreDispositivo(""+hudp1.numHilo,hudp1.numHilo);
+        VP.ponNombreDispositivo(String.valueOf(hudp1.numHilo),hudp1.numHilo);
         hudp2.start();
-        VP.ponNombreDispositivo(""+hudp2.numHilo,hudp2.numHilo);
+        VP.ponNombreDispositivo(String.valueOf(hudp2.numHilo),hudp2.numHilo);
         hd.start();
     }
 }
